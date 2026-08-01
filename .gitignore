@@ -18,3 +18,5 @@ data/
 *.jsonl
 *.jsonl.gz
 logs/
+sandbox/
+*.ipynb
