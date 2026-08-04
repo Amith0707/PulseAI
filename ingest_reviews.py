@@ -1,3 +1,6 @@
+"""This is mainly to take 1k demo samples in parquet file and ingest into postgres db 
+Later we will make a mechanism to skip taking from parquet like direct user revuew into the db """
+
 import pandas as pd
 from db import save_review
 

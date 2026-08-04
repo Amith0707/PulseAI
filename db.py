@@ -1,3 +1,8 @@
+"""
+This I have changed to handle two tables now one is reviews table coming from Parquet later direct from front end supporting ingest.py
+The other table being classification that stores LLM outputs and merges them using Joins helps making Genie
+"""
+
 import os
 import psycopg2
 from dotenv import load_dotenv

@@ -1,3 +1,6 @@
+"""This I have set it up to take 1k reviews within 6 months of time stamp now
+Later I will spin it up to take randomly between any two windows to show live incoming data processing"""
+
 import pandas as pd
 import random
 
