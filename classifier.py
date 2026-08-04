@@ -5,7 +5,7 @@ from openai import OpenAI
 from pydantic import BaseModel, ValidationError
 from typing import Literal
 from utils.logger import logger
-from utils.const import MODEL, SYSTEM_PROMPT, FEW_SHOT_EXAMPLES, CLASSIFY_FEEDBACK_TOOL, SUMMARY_SYSTEM_PROMPT
+from utils.const import MODEL, SYSTEM_PROMPT, FEW_SHOT_EXAMPLES, CLASSIFY_FEEDBACK_TOOL, SUMMARY_SYSTEM_PROMPT, QUERY_PARSE_SYSTEM_PROMPT, PARSE_QUERY_TOOL
 
 load_dotenv()
 
@@ -182,6 +182,44 @@ def classify_review(review_text: str, max_retries: int = 2) -> dict:
                 continue
             logger.log("Max retries reached after API failures, using fallback", level="error")
             return FALLBACK_RESULT
+
+def parse_natural_language_query(question: str, schema: dict) -> dict:
+    """Convert a natural language question into structured filter parameters.
+
+    Parameters
+    ----------
+    question : str
+        The user's plain-English question.
+    schema : dict
+        Schema info from :func:`schema_info.get_schema_info`, used to
+        ground the LLM in real, existing filter values.
+
+    Returns
+    -------
+    dict
+        Keys: query_type, product_category, feedback_category, sentiment,
+        urgency (any of the filter fields may be None), and explanation.
+    """
+    schema_text = f"""Available columns and their real values:
+{schema['columns']}
+Total rows in dataset: {schema['row_count']}"""
+
+    try:
+        response = client.chat.completions.create(
+            model=MODEL,
+            messages=[
+                {"role": "system", "content": QUERY_PARSE_SYSTEM_PROMPT},
+                {"role": "user", "content": f"Schema:\n{schema_text}\n\nQuestion: {question}"}
+            ],
+            tools=[PARSE_QUERY_TOOL],
+            tool_choice={"type": "function", "function": {"name": "parse_query"}},
+            temperature=0.1
+        )
+        tool_call = response.choices[0].message.tool_calls[0]
+        return json.loads(tool_call.function.arguments)
+    except Exception as e:
+        logger.log(f"Query parsing failed: {e}", level="error")
+        return {"query_type": "unsupported", "explanation": "Unable to process this question due to a system error."}
 
 def generate_summary(stats: dict) -> str:
     """Generate a narrative weekly insight summary from aggregated stats.

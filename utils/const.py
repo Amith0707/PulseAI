@@ -52,6 +52,49 @@ Do not simply restate every number — synthesize the data into insight. Avoid g
 phrases like "customer satisfaction is important" — every sentence should carry a
 specific, sourced fact from the data provided."""
 
+QUERY_PARSE_SYSTEM_PROMPT = """You are PulseAI's query assistant. You will be given a
+natural language question about customer feedback data, along with the actual schema
+(available columns and their real possible values).
+
+Convert the question into a structured query specification using the parse_query tool.
+
+Only use filter values that actually appear in the schema provided — never invent a
+category, sentiment, or urgency value that isn't listed.
+
+If the question asks for a count (e.g., "how many negative reviews"), set query_type
+to "count" and specify the relevant filters.
+
+If the question asks for a breakdown or count of EACH value in a column (e.g.,
+"count of each category", "how many reviews per sentiment", "breakdown by product
+category"), set query_type to "breakdown" and specify breakdown_column as the exact
+column name to group by. Any other filters mentioned (e.g., "breakdown by category
+for Electronics only") should still be populated in the other filter fields.
+
+DATE RANGES:
+- If the question specifies a date range, populate date_start and date_end in
+  YYYY-MM-DD format.
+- If date_start is chronologically after date_end (e.g., "October 2022 to July 2022"),
+  assume the user meant the range in the other order — swap them so date_start is
+  always the earlier date — and clearly state in the explanation that you reordered
+  the dates (e.g., "Interpreted as July 2022 to October 2022, reordering the dates
+  you provided, since July comes before October").
+- If the requested date range falls entirely outside the available source data range
+  (given in the schema), set query_type to "unsupported" and explain that no data
+  exists in that range, stating the actual available range.
+- If the requested date range partially overlaps the available data, proceed with
+  query_type "count" using the overlapping portion, and note in the explanation that
+  the range was clipped to the available data.
+
+If the question cannot be answered with the available columns, set query_type to
+"unsupported" and explain why in the explanation field.
+
+If the question asks to find or look up a specific review by its ID (e.g., "find review
+abc123", "show me review xyz"), set query_type to "lookup" and populate review_id with
+the exact ID given. If the review_id doesn't look like a plausible identifier or is
+clearly a placeholder/made-up value, still attempt the lookup — the database itself will
+correctly report if no matching review exists, rather than you guessing whether it's valid.
+"""
+
 FEW_SHOT_EXAMPLES = [
     {
         "review": "This computer lasted about 1 day before it couldn't recognize a hard drive available. Somehow, it got damaged during shipping (which took almost 2 weeks)",
@@ -148,6 +191,52 @@ CLASSIFY_FEEDBACK_TOOL = {
                 }
             },
             "required": ["feedback_category", "sentiment", "urgency", "reasoning"]
+        }
+    }
+}
+
+PARSE_QUERY_TOOL = {
+    "type": "function",
+    "function": {
+        "name": "parse_query",
+        "description": "Convert a natural language question into structured filter parameters",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "query_type": {
+                    "type": "string",
+                    "enum": ["count", "lookup", "breakdown", "unsupported"]
+                },
+                "review_id": {
+                    "type": ["string", "null"],
+                    "description": "The specific review_id to look up. Only used when query_type is 'lookup'."
+                },
+                "breakdown_column": {
+                    "type": ["string", "null"],
+                    "description": "The column to group by and count, if query_type is 'breakdown' (e.g., 'feedback_category', 'sentiment', 'product_category')."
+                },
+                "product_category": {"type": ["string", "null"]},
+                "feedback_category": {"type": ["string", "null"]},
+                "sentiment": {"type": ["string", "null"]},
+                "urgency": {"type": ["string", "null"]},
+                "verified_purchase": {
+                    "type": ["boolean", "null"],
+                    "description": "True or false, if the question asks about verified purchases specifically."
+                },
+                "date_start": {
+                    "type": ["string", "null"],
+                    "description": "Start date in YYYY-MM-DD format, if the question specifies a date range."
+                },
+                "date_end": {
+                    "type": ["string", "null"],
+                    "description": "End date in YYYY-MM-DD format, if the question specifies a date range."
+                },
+                "explanation": {
+                    "type": "string",
+                    "description": "One sentence explaining how the question was interpreted, or why it's unsupported"
+                }
+            },
+            "required": ["query_type", "explanation"]
         }
     }
 }

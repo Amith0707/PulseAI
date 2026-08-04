@@ -43,3 +43,52 @@ def get_table_preview(table_name, limit=50):
         "columns": columns,
         "rows": [dict(zip(columns, row)) for row in rows]
     }
+
+def get_schema_info():
+    conn = get_connection()
+    cur = conn.cursor()
+
+    cur.execute("SELECT COUNT(*) FROM reviews;")
+    row_count = cur.fetchone()[0]
+
+    cur.execute("SELECT MIN(review_date), MAX(review_date) FROM reviews;")
+    min_date, max_date = cur.fetchone()
+
+    cur.execute("SELECT DISTINCT feedback_category FROM classifications;")
+    feedback_categories = [r[0] for r in cur.fetchall()]
+
+    cur.execute("SELECT DISTINCT product_category FROM reviews;")
+    product_categories = [r[0] for r in cur.fetchall()]
+
+    cur.execute("SELECT DISTINCT sentiment FROM classifications;")
+    sentiments = [r[0] for r in cur.fetchall()]
+
+    cur.execute("SELECT DISTINCT urgency FROM classifications;")
+    urgencies = [r[0] for r in cur.fetchall()]
+
+    cur.execute("SELECT DISTINCT quarter FROM reviews;")
+    quarters = [r[0] for r in cur.fetchall()]
+
+    cur.close()
+    conn.close()
+
+    return {
+        "table_name": "reviews joined with classifications",
+        "row_count": row_count,
+        "source_data_date_range": {"min": str(min_date), "max": str(max_date)},
+        "columns": [
+            {"name": "review_id", "type": "identifier",
+             "note": "Unique ID for a specific review. Use for direct lookup of one review, not for filtering/counting."},
+            {"name": "product_category", "type": "categorical", "possible_values": product_categories},
+            {"name": "feedback_category", "type": "categorical", "possible_values": feedback_categories},
+            {"name": "sentiment", "type": "categorical", "possible_values": sentiments},
+            {"name": "urgency", "type": "categorical", "possible_values": urgencies},
+            {"name": "quarter", "type": "categorical", "possible_values": quarters},
+            {"name": "rating", "type": "numeric", "range": "1.0 to 5.0"},
+            {"name": "review_date", "type": "date",
+             "range": f"{min_date} to {max_date}",
+             "note": "Use for specific date-range questions, not just quarter labels."},
+            {"name": "verified_purchase", "type": "boolean", "possible_values": [True, False],
+             "note": "Whether Amazon verified the reviewer actually purchased the product."},
+        ]
+    }

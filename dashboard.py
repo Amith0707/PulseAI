@@ -1,9 +1,12 @@
 import dash
-from dash import dcc, html, Input, Output
+from dash import dcc, html, Input, Output, State
 import plotly.express as px
 import pandas as pd
+
+from schema_info import get_schema_info, get_table_preview, ALLOWED_TABLES
+from db import get_connection
 from aggregation import get_aggregated_stats
-from schema_info import get_table_preview, ALLOWED_TABLES
+from classifier import parse_natural_language_query
 
 app = dash.Dash(__name__)
 app.title = "PulseAI — Feedback Dashboard"
@@ -129,6 +132,157 @@ app.layout = html.Div([
     ], className="analytics-section"),
 ])
 
+@app.callback(
+    Output("query-result-area", "children", allow_duplicate=True),
+    Input("ask-btn", "n_clicks"),
+    State("query-input", "value"),
+    prevent_initial_call=True
+)
+def handle_query(n_clicks, question):
+    """Parse a natural language question and return a count, lookup,
+    or unsupported response."""
+    if not question:
+        return html.Span("Type a question first.", className="no-questions-text")
+
+    schema = get_schema_info()
+    parsed = parse_natural_language_query(question, schema)
+
+    if parsed["query_type"] == "unsupported":
+        return html.Div([
+            html.Div(parsed["explanation"], className="answer-explanation")
+        ], className="answer-card")
+
+    conn = get_connection()
+    cur = conn.cursor()
+
+    if parsed["query_type"] == "lookup":
+        review_id = parsed.get("review_id")
+        cur.execute("""
+            SELECT r.review_id, r.product_category, r.product_title, r.review_text,
+                   r.rating, r.review_date, r.verified_purchase,
+                   c.feedback_category, c.sentiment, c.urgency, c.reasoning
+            FROM reviews r
+            LEFT JOIN classifications c ON r.review_id = c.review_id
+            WHERE r.review_id = %s;
+        """, (review_id,))
+        row = cur.fetchone()
+        cur.close()
+        conn.close()
+
+        if row is None:
+            return html.Div([
+                html.Div(f"No review found with ID '{review_id}'.", className="answer-explanation")
+            ], className="answer-card")
+
+        columns = ["review_id", "product_category", "product_title", "review_text",
+                   "rating", "review_date", "verified_purchase",
+                   "feedback_category", "sentiment", "urgency", "reasoning"]
+        result_dict = dict(zip(columns, row))
+
+        return html.Div([
+            html.Div(parsed["explanation"], className="answer-explanation"),
+            html.Table([
+                html.Tr([html.Td(html.B(k)), html.Td(str(v))]) for k, v in result_dict.items()
+            ], className="preview-table", style={"marginTop": "12px"})
+        ], className="answer-card")
+
+    if parsed["query_type"] == "breakdown":
+        column = parsed.get("breakdown_column")
+        valid_columns = {
+            "product_category": "r.product_category",
+            "feedback_category": "c.feedback_category",
+            "sentiment": "c.sentiment",
+            "urgency": "c.urgency",
+            "quarter": "r.quarter",
+            "verified_purchase": "r.verified_purchase",
+        }
+
+        if column not in valid_columns:
+            cur.close()
+            conn.close()
+            return html.Div([
+                html.Div(f"'{column}' isn't a valid column to break down by.", className="answer-explanation")
+            ], className="answer-card")
+
+        sql_column = valid_columns[column]
+
+        conditions = []
+        params = []
+        for field in ["product_category", "feedback_category", "sentiment", "urgency"]:
+            value = parsed.get(field)
+            if value:
+                col = "r.product_category" if field == "product_category" else f"c.{field}"
+                conditions.append(f"{col} = %s")
+                params.append(value)
+
+        where_clause = " AND ".join(conditions) if conditions else "TRUE"
+        sql = f"""
+            SELECT {sql_column}, COUNT(*) as count
+            FROM reviews r
+            LEFT JOIN classifications c ON r.review_id = c.review_id
+            WHERE {where_clause}
+            GROUP BY {sql_column}
+            ORDER BY count DESC;
+        """
+        cur.execute(sql, params)
+        rows = cur.fetchall()
+        cur.close()
+        conn.close()
+
+        table_rows = [html.Tr([html.Td(str(r[0]) if r[0] is not None else "null"), html.Td(str(r[1]))]) for r in rows]
+
+        return html.Div([
+            html.Div(parsed["explanation"], className="answer-explanation"),
+            html.Table(
+                [html.Tr([html.Th(column), html.Th("count")])] + table_rows,
+                className="preview-table", style={"marginTop": "12px"}
+            ),
+            html.Details([
+                html.Summary("View generated query"),
+                html.Pre(sql, style={"fontSize": "12px", "background": "var(--slate-100)", "padding": "10px"})
+            ])
+        ], className="answer-card")
+
+    # query_type == "count"
+    conditions = []
+    params = []
+    for field in ["product_category", "feedback_category", "sentiment", "urgency"]:
+        value = parsed.get(field)
+        if value:
+            column = "r.product_category" if field == "product_category" else f"c.{field}"
+            conditions.append(f"{column} = %s")
+            params.append(value)
+
+    if parsed.get("verified_purchase") is not None:
+        conditions.append("r.verified_purchase = %s")
+        params.append(parsed["verified_purchase"])
+
+    date_start = parsed.get("date_start")
+    date_end = parsed.get("date_end")
+    if date_start and date_end:
+        conditions.append("r.review_date BETWEEN %s AND %s")
+        params.append(date_start)
+        params.append(date_end)
+
+    where_clause = " AND ".join(conditions) if conditions else "TRUE"
+    sql = f"""
+        SELECT COUNT(*) FROM reviews r
+        LEFT JOIN classifications c ON r.review_id = c.review_id
+        WHERE {where_clause};
+    """
+    cur.execute(sql, params)
+    count = cur.fetchone()[0]
+    cur.close()
+    conn.close()
+
+    return html.Div([
+        html.Div(str(count), className="answer-value"),
+        html.Div(parsed["explanation"], className="answer-explanation"),
+        html.Details([
+            html.Summary("View generated query"),
+            html.Pre(sql, style={"fontSize": "12px", "background": "var(--slate-100)", "padding": "10px"})
+        ])
+    ], className="answer-card")
 
 # ============ Table browsing callback ============
 @app.callback(
