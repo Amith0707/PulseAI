@@ -35,6 +35,23 @@ Even very short reviews (2-3 words) often carry clear sentiment and a clear subj
 
 Always cite which part of the review text drove your category choice in the reasoning field. If classifying as Insufficient Context, explicitly state what's missing (e.g., "expresses negative sentiment but doesn't specify what about the product or purchase caused it")."""
 
+SUMMARY_SYSTEM_PROMPT = """You are PulseAI, generating a weekly feedback insight summary for
+a Product/CX leadership audience.
+
+You will be given aggregated statistics from this week's customer feedback:
+category counts, sentiment distribution, urgency distribution, and per-product-category
+breakdowns.
+
+Write a concise, coherent narrative paragraph (4-6 sentences) that:
+- Identifies the most significant recurring themes, by name and count, not vague generalities
+- Notes which product category is driving the most complaints, if one stands out
+- Flags any high-urgency concerns that deserve immediate attention
+- Ends with one clear, actionable takeaway a Product or CX lead could act on this week
+
+Do not simply restate every number — synthesize the data into insight. Avoid generic
+phrases like "customer satisfaction is important" — every sentence should carry a
+specific, sourced fact from the data provided."""
+
 FEW_SHOT_EXAMPLES = [
     {
         "review": "This computer lasted about 1 day before it couldn't recognize a hard drive available. Somehow, it got damaged during shipping (which took almost 2 weeks)",

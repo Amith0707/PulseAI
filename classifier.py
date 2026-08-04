@@ -5,7 +5,7 @@ from openai import OpenAI
 from pydantic import BaseModel, ValidationError
 from typing import Literal
 from utils.logger import logger
-from utils.const import MODEL, SYSTEM_PROMPT, FEW_SHOT_EXAMPLES, CLASSIFY_FEEDBACK_TOOL
+from utils.const import MODEL, SYSTEM_PROMPT, FEW_SHOT_EXAMPLES, CLASSIFY_FEEDBACK_TOOL, SUMMARY_SYSTEM_PROMPT
 
 load_dotenv()
 
@@ -183,6 +183,55 @@ def classify_review(review_text: str, max_retries: int = 2) -> dict:
             logger.log("Max retries reached after API failures, using fallback", level="error")
             return FALLBACK_RESULT
 
+def generate_summary(stats: dict) -> str:
+    """Generate a narrative weekly insight summary from aggregated stats.
+
+    Unlike :func:`classify_review`, this call does not use tool-calling
+    or schema enforcement, since the desired output is free-form prose,
+    not structured data.
+
+    Parameters
+    ----------
+    stats : dict
+        Aggregated statistics, as returned by
+        :func:`aggregation.get_aggregated_stats` — expects keys
+        ``category_counts``, ``sentiment_counts``, ``urgency_counts``,
+        and ``product_category_counts``.
+
+    Returns
+    -------
+    str
+        A coherent narrative paragraph summarizing the week's feedback.
+
+    Examples
+    --------
+    >>> from aggregation import get_aggregated_stats
+    >>> stats = get_aggregated_stats()
+    >>> summary = generate_summary(stats)
+    >>> len(summary) > 0
+    True
+    """
+    stats_text = f"""Feedback category counts: {stats['category_counts']}
+Sentiment distribution: {stats['sentiment_counts']}
+Urgency distribution: {stats['urgency_counts']}
+Reviews by product category: {stats['product_category_counts']}
+Total reviews this week: {stats['total_count']}"""
+
+    try:
+        response = client.chat.completions.create(
+            model=MODEL,
+            messages=[
+                {"role": "system", "content": SUMMARY_SYSTEM_PROMPT},
+                {"role": "user", "content": stats_text}
+            ],
+            temperature=0.3
+        )
+        summary = response.choices[0].message.content
+        logger.log("Weekly summary generated successfully")
+        return summary
+    except Exception as e:
+        logger.log(f"Summary generation failed: {e}", level="error")
+        return "Unable to generate summary this week due to a system error. Raw statistics are available in the dashboard charts above."
 
 if __name__ == "__main__":
     test_result = classify_review("This broke after one use, terrible quality for the price")
