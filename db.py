@@ -63,6 +63,18 @@ def init_db():
             classified_at TIMESTAMP DEFAULT NOW()
         );
     """)
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS summaries (
+            id SERIAL PRIMARY KEY,
+            window_label TEXT NOT NULL UNIQUE,
+            date_start DATE NOT NULL,
+            date_end DATE NOT NULL,
+            total_reviews INTEGER NOT NULL,
+            stats JSONB NOT NULL,
+            narrative TEXT NOT NULL,
+            generated_at TIMESTAMP DEFAULT NOW()
+        );
+    """)
     conn.commit()
     cur.close()
     conn.close()

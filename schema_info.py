@@ -1,5 +1,5 @@
+import pandas as pd
 from db import get_connection
-
 ALLOWED_TABLES = ["reviews", "classifications"]
 
 
@@ -92,3 +92,28 @@ def get_schema_info():
              "note": "Whether Amazon verified the reviewer actually purchased the product."},
         ]
     }
+
+def validate_date_range(date_start, date_end):
+    """Check a requested date range against the database's actual
+    current coverage — always queried live, never hardcoded, so this
+    stays correct even as new data is appended in the future.
+
+    Returns
+    -------
+    tuple
+        (is_valid: bool, message: str) — message explains the actual
+        available range if invalid.
+    """
+    conn = get_connection()
+    cur = conn.cursor()
+    cur.execute("SELECT MIN(review_date), MAX(review_date) FROM reviews;")
+    data_min, data_max = cur.fetchone()
+    cur.close()
+    conn.close()
+
+    req_start = pd.Timestamp(date_start)
+    req_end = pd.Timestamp(date_end)
+
+    if req_end < data_min or req_start > data_max:
+        return False, f"No data available in that range. Currently available: {data_min.date()} to {data_max.date()}."
+    return True, None
