@@ -5,7 +5,7 @@ from openai import OpenAI
 from pydantic import BaseModel, ValidationError
 from typing import Literal
 from utils.logger import logger
-from utils.const import MODEL, SYSTEM_PROMPT, FEW_SHOT_EXAMPLES, CLASSIFY_FEEDBACK_TOOL, SUMMARY_SYSTEM_PROMPT, QUERY_PARSE_SYSTEM_PROMPT, PARSE_QUERY_TOOL
+from utils.const import MODEL, SYSTEM_PROMPT, FEW_SHOT_EXAMPLES, CLASSIFY_FEEDBACK_TOOL, SUMMARY_SYSTEM_PROMPT, QUERY_PARSE_SYSTEM_PROMPT, PARSE_QUERY_TOOL,FOLLOWUP_SYSTEM_PROMPT
 
 load_dotenv()
 
@@ -270,6 +270,42 @@ Total reviews this week: {stats['total_count']}"""
     except Exception as e:
         logger.log(f"Summary generation failed: {e}", level="error")
         return "Unable to generate summary this week due to a system error. Raw statistics are available in the dashboard charts above."
+
+def suggest_followup_questions(narrative: str, stats: dict) -> list:
+    """Generate 3 relevant follow-up questions based on a summary just shown.
+
+    Parameters
+    ----------
+    narrative : str
+        The summary narrative just displayed to the user.
+    stats : dict
+        The underlying stats that generated it.
+
+    Returns
+    -------
+    list of str
+        3 suggested follow-up questions. Returns a safe generic fallback
+        list if generation fails.
+    """
+    try:
+        response = client.chat.completions.create(
+            model=MODEL,
+            messages=[
+                {"role": "system", "content": FOLLOWUP_SYSTEM_PROMPT},
+                {"role": "user", "content": f"Summary: {narrative}\n\nStats: {stats}"}
+            ],
+            temperature=0.4
+        )
+        text = response.choices[0].message.content
+        questions = [q.strip("- ").strip() for q in text.split("\n") if q.strip()]
+        return questions[:3]
+    except Exception as e:
+        logger.log(f"Follow-up generation failed: {e}", level="error")
+        return [
+            "How does this compare to the previous period?",
+            "Which product category has the most urgent issues?",
+            "What's the sentiment breakdown for negative reviews?"
+        ]
 
 if __name__ == "__main__":
     test_result = classify_review("This broke after one use, terrible quality for the price")

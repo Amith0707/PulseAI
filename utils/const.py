@@ -85,6 +85,11 @@ DATE RANGES:
   query_type "count" using the overlapping portion, and note in the explanation that
   the range was clipped to the available data.
 
+If the question asks for a narrative summary, overview, or insight report for a
+specific time period (e.g., "how was sentiment from Jan to April 2022", "summarize
+this quarter", "give me an overview of March 2022"), set query_type to "summary"
+and populate date_start and date_end for the requested range.
+
 If the question cannot be answered with the available columns, set query_type to
 "unsupported" and explain why in the explanation field.
 
@@ -94,6 +99,14 @@ the exact ID given. If the review_id doesn't look like a plausible identifier or
 clearly a placeholder/made-up value, still attempt the lookup — the database itself will
 correctly report if no matching review exists, rather than you guessing whether it's valid.
 """
+
+FOLLOWUP_SYSTEM_PROMPT = """You are PulseAI's assistant. Given a weekly/quarterly
+feedback summary and its underlying stats, suggest exactly 3 short, specific follow-up
+questions a Product or CX lead would naturally want to ask next.
+
+Questions should be answerable using the same kind of data (category breakdowns,
+sentiment, urgency, date ranges, comparisons between periods) — not vague or generic.
+Keep each question under 12 words."""
 
 FEW_SHOT_EXAMPLES = [
     {
@@ -205,7 +218,7 @@ PARSE_QUERY_TOOL = {
             "properties": {
                 "query_type": {
                     "type": "string",
-                    "enum": ["count", "lookup", "breakdown", "unsupported"]
+                    "enum": ["count", "lookup", "breakdown", "summary", "unsupported"]
                 },
                 "review_id": {
                     "type": ["string", "null"],

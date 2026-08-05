@@ -5,8 +5,8 @@ import pandas as pd
 
 from schema_info import get_schema_info, get_table_preview, ALLOWED_TABLES
 from db import get_connection
-from aggregation import get_aggregated_stats
-from classifier import parse_natural_language_query
+from aggregation import get_aggregated_stats, generate_and_store_summary
+from classifier import parse_natural_language_query, suggest_followup_questions
 
 app = dash.Dash(__name__)
 app.title = "PulseAI — Feedback Dashboard"
@@ -130,6 +130,19 @@ app.layout = html.Div([
             html.Div(dcc.Graph(id="chart-product-category"), className="chart-card"),
         ], className="chart-row"),
     ], className="analytics-section"),
+
+    # ============ Rolling summary section ============
+    html.Div([
+        html.H2("Rolling Summary"),
+        dcc.Input(
+            id="summary-query-input",
+            type="text",
+            placeholder="e.g. 'Summarize Q1 2022' or 'How was sentiment from Jan to March 2022'",
+            className="genie-input"
+        ),
+        html.Button("Get Summary", id="summary-ask-btn", className="genie-ask-btn"),
+        html.Div(id="summary-display-area"),
+    ], className="analytics-section", id="summary-section"),
 ])
 
 @app.callback(
@@ -360,6 +373,40 @@ def update_dashboard(product_categories, feedback_categories, sentiments, urgenc
     )
 
     return total_text, fig_category, fig_sentiment, fig_urgency, fig_product
+
+
+# ============ Rolling summary callback ============
+@app.callback(
+    Output("summary-display-area", "children"),
+    Input("summary-ask-btn", "n_clicks"),
+    State("summary-query-input", "value"),
+    prevent_initial_call=True
+)
+def handle_summary_request(n_clicks, question):
+    """Generate one summary for a user's typed request, showing
+    follow-up suggestions as static placeholders (not yet clickable)."""
+    if not question:
+        return html.Span("Type a request first.", className="no-questions-text")
+
+    schema = get_schema_info()
+    parsed = parse_natural_language_query(question, schema)
+
+    if parsed["query_type"] != "summary" or not parsed.get("date_start"):
+        return html.Div(parsed["explanation"], className="answer-explanation")
+
+    window_label = f"Custom: {parsed['date_start']} to {parsed['date_end']}"
+    result = generate_and_store_summary(window_label, parsed["date_start"], parsed["date_end"])
+
+    if not result["success"]:
+        return html.Div(result["error"], className="answer-explanation")
+
+    followups = suggest_followup_questions(result["narrative"], result["stats"])
+
+    return html.Div([
+        html.Div(result["narrative"], className="answer-explanation"),
+        html.Div("Suggested follow-up questions:", style={"marginTop": "16px", "fontWeight": "600"}),
+        html.Div([html.Button(q, className="suggestion-chip", disabled=True) for q in followups])
+    ], className="answer-card")
 
 
 if __name__ == "__main__":
