@@ -183,7 +183,7 @@ def classify_review(review_text: str, max_retries: int = 2) -> dict:
             logger.log("Max retries reached after API failures, using fallback", level="error")
             return FALLBACK_RESULT
 
-def parse_natural_language_query(question: str, schema: dict) -> dict:
+def parse_natural_language_query(question: str, schema: dict, conversation_history: list = None) -> dict:
     """Convert a natural language question into structured filter parameters.
 
     Parameters
@@ -193,6 +193,12 @@ def parse_natural_language_query(question: str, schema: dict) -> dict:
     schema : dict
         Schema info from :func:`schema_info.get_schema_info`, used to
         ground the LLM in real, existing filter values.
+    conversation_history : list of dict, optional
+        Recent turns from the chat session, in the same shape as
+        chat-history-store entries (``{"role": "user", "text": ...}`` or
+        ``{"role": "assistant", "kind": ..., "explanation"/"narrative": ...}``),
+        so follow-ups like "make that a bar chart" can resolve against
+        what was asked/answered earlier. Default None (no history).
 
     Returns
     -------
@@ -204,13 +210,20 @@ def parse_natural_language_query(question: str, schema: dict) -> dict:
 {schema['columns']}
 Total rows in dataset: {schema['row_count']}"""
 
+    messages = [{"role": "system", "content": QUERY_PARSE_SYSTEM_PROMPT}]
+
+    for entry in (conversation_history or [])[-8:]:
+        if entry["role"] == "user":
+            messages.append({"role": "user", "content": entry["text"]})
+        else:
+            messages.append({"role": "assistant", "content": entry.get("explanation") or entry.get("narrative") or ""})
+
+    messages.append({"role": "user", "content": f"Schema:\n{schema_text}\n\nQuestion: {question}"})
+
     try:
         response = client.chat.completions.create(
             model=MODEL,
-            messages=[
-                {"role": "system", "content": QUERY_PARSE_SYSTEM_PROMPT},
-                {"role": "user", "content": f"Schema:\n{schema_text}\n\nQuestion: {question}"}
-            ],
+            messages=messages,
             tools=[PARSE_QUERY_TOOL],
             tool_choice={"type": "function", "function": {"name": "parse_query"}},
             temperature=0.1

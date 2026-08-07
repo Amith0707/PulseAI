@@ -14,7 +14,7 @@ categories = [
 
 WINDOW_START = pd.Timestamp("2022-01-01")
 WINDOW_END = pd.Timestamp("2022-06-30")
-Q1_END = pd.Timestamp("2022-03-31")  # boundary between Q1 (Jan-Mar) and Q2 (Apr-Jun)
+Q1_END = pd.Timestamp("2022-03-31")
 
 
 def load_windowed_category(category):

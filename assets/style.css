@@ -25,8 +25,6 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
-/* ---- Top brand bar ---- */
-
 .pulseai-header {
   background: var(--navy-900);
   color: white;
@@ -48,8 +46,6 @@ body {
   font-weight: 700;
 }
 
-/* ---- Genie query panel container ---- */
-
 .genie-panel {
   display: flex;
   background: var(--card);
@@ -59,8 +55,6 @@ body {
   overflow: hidden;
   min-height: 480px;
 }
-
-/* ---- Left sidebar ---- */
 
 .genie-sidebar {
   width: 260px;
@@ -113,8 +107,6 @@ body {
   font-style: italic;
 }
 
-/* ---- Main query area ---- */
-
 .genie-main {
   flex: 1;
   padding: 28px 32px;
@@ -128,8 +120,13 @@ body {
 
 .genie-input {
   flex: 1;
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
   padding: 12px 16px;
   font-size: 14px;
+  line-height: 1.4;
+  height: 44px;
   border: 1px solid var(--border);
   border-radius: 8px;
   background: var(--slate-100);
@@ -156,15 +153,11 @@ body {
 
 .genie-ask-btn:hover { background: var(--accent-dark); }
 
-/* ---- Table dropdown ---- */
-
 .table-dropdown .Select-control,
 .table-dropdown .select-control {
   border-radius: 8px !important;
   border-color: var(--border) !important;
 }
-
-/* ---- Result / preview area ---- */
 
 .result-heading {
   font-size: 15px;
@@ -224,8 +217,6 @@ body {
   line-height: 1.5;
 }
 
-/* ---- Analytics dashboard section ---- */
-
 .analytics-section {
   margin: 24px 32px 60px;
 }
@@ -276,6 +267,7 @@ body {
 
 .chart-card {
   flex: 1;
+  min-width: 0;
   background: var(--card);
   border: 1px solid var(--border);
   border-radius: 10px;
@@ -296,3 +288,45 @@ body {
 .suggestion-chip:hover { background: var(--accent); color: white; }
 .suggestion-chip:disabled { cursor: default; opacity: 0.7; }
 .suggestion-chip:disabled:hover { background: white; color: var(--accent); }
+
+.chat-new-btn {
+  width: 100%;
+  margin-bottom: 16px;
+}
+
+.chat-session-active {
+  border-color: var(--accent);
+  font-weight: 600;
+}
+
+.chat-thread {
+  max-height: 460px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column-reverse;
+  gap: 14px;
+  padding: 4px 4px 12px;
+}
+
+.chat-input-row {
+  margin-top: 16px;
+  margin-bottom: 0;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+
+.chat-bubble-user {
+  align-self: flex-end;
+  max-width: 75%;
+  background: var(--accent);
+  color: white;
+  border-radius: 12px;
+  padding: 10px 16px;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.chat-bubble-assistant {
+  align-self: flex-start;
+  max-width: 85%;
+}

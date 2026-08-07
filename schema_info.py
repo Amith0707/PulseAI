@@ -30,9 +30,6 @@ def get_table_preview(table_name, limit=50):
 
     conn = get_connection()
     cur = conn.cursor()
-    # table_name is validated against an allowlist above, safe to use in f-string here —
-    # never do this with unvalidated user input, since normal parameterization
-    # (%s) does not work for table/column names in SQL, only for values
     cur.execute(f"SELECT * FROM {table_name} LIMIT %s;", (limit,))
     columns = [desc[0] for desc in cur.description]
     rows = cur.fetchall()

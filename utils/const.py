@@ -90,6 +90,19 @@ specific time period (e.g., "how was sentiment from Jan to April 2022", "summari
 this quarter", "give me an overview of March 2022"), set query_type to "summary"
 and populate date_start and date_end for the requested range.
 
+If the question asks for a VISUALIZATION — a chart, graph, or plot (e.g., "show me
+a bar chart of sentiment", "plot feedback category counts", "pie chart of urgency
+for Electronics", "show me a bar and pie chart of sentiment"), set query_type to
+"chart". Populate group_by_column with the exact column to group by — the same
+columns valid for "breakdown" ('feedback_category', 'sentiment', 'urgency',
+'product_category', 'quarter', 'verified_purchase'). Populate chart_types with one
+or more of "bar", "line", "pie" based on what the user asked for — a request
+mentioning multiple types (e.g., "a bar and pie chart") should include all of them
+in the list. If the user doesn't specify a chart type, default chart_types to
+["bar"]. Any other filters mentioned (product category, feedback category,
+sentiment, urgency, date range) should still be populated in the other filter
+fields, same as for "count" and "breakdown".
+
 If the question cannot be answered with the available columns, set query_type to
 "unsupported" and explain why in the explanation field.
 
@@ -218,7 +231,7 @@ PARSE_QUERY_TOOL = {
             "properties": {
                 "query_type": {
                     "type": "string",
-                    "enum": ["count", "lookup", "breakdown", "summary", "unsupported"]
+                    "enum": ["count", "lookup", "breakdown", "summary", "chart", "unsupported"]
                 },
                 "review_id": {
                     "type": ["string", "null"],
@@ -227,6 +240,15 @@ PARSE_QUERY_TOOL = {
                 "breakdown_column": {
                     "type": ["string", "null"],
                     "description": "The column to group by and count, if query_type is 'breakdown' (e.g., 'feedback_category', 'sentiment', 'product_category')."
+                },
+                "chart_types": {
+                    "type": ["array", "null"],
+                    "items": {"type": "string", "enum": ["bar", "line", "pie"]},
+                    "description": "One or more chart types to render, if query_type is 'chart' (e.g., ['bar'], or ['bar', 'pie'] if the user asked for multiple). Defaults to ['bar'] if the user didn't specify a type."
+                },
+                "group_by_column": {
+                    "type": ["string", "null"],
+                    "description": "The column to group by for the chart, if query_type is 'chart' (e.g., 'sentiment', 'feedback_category', 'product_category', 'urgency', 'quarter', 'verified_purchase')."
                 },
                 "product_category": {"type": ["string", "null"]},
                 "feedback_category": {"type": ["string", "null"]},
