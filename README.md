@@ -65,7 +65,7 @@ A customer review comes in as plain text. PulseAI:
 ### Setup
 
 ```bash
-git clone <repo-url>
+git clone https://github.com/Amith0707/PulseAI.git
 cd PulseAI
 python3 -m venv .venv
 source .venv/bin/activate
